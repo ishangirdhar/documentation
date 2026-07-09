@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const DIST_FOLDER = 'dist';
-const WORDS_PER_FILE = 5000;
 const OUTPUT_EXTENSION = '.md';
 const FILE_SUFFIX = '.mdoc';
 
@@ -29,64 +28,27 @@ async function findMarkdocFiles(dir) {
 }
 
 /**
- * Get the word count of a file
- * @param filePath
- * @returns {Promise<number>}
- */
-async function getWordCount(filePath) {
-    const content = await fs.readFile(filePath, 'utf-8');
-
-    return content.split(/\s+/).length;
-}
-
-/**
- * Concatenate all files into a single file
+ * Convert each .mdoc file to its own .md file, mirroring the source
+ * directory structure inside the dist folder.
  * @param files
- * @param wordsPerFile
+ * @param sourcePath
  * @returns {Promise<void>}
  */
-async function concatenateFiles(files, wordsPerFile) {
-    let concatenatedContent = '';
-    let fileCounter = 1;
-    let wordCounter = 0;
-    let combinedNames = [];
-
-    await fs.mkdir(DIST_FOLDER, {recursive: true});
-
+async function convertFiles(files, sourcePath) {
     for (const file of files) {
         const content = await fs.readFile(file, 'utf-8');
 
-        let fileContent = `-----------------\n`;
-        fileContent += `FILE PATH: ${file}\n\n${content}\n\n`;
+        // Preserve the directory structure relative to the source path.
+        const relativePath = path.relative(sourcePath, file);
+        const outputPath = path.join(
+            DIST_FOLDER,
+            relativePath.replace(new RegExp(`${FILE_SUFFIX}$`), OUTPUT_EXTENSION)
+        );
 
-        concatenatedContent += fileContent;
-        wordCounter += fileContent.split(/\s+/).length;
-        combinedNames.push(path.basename(file, FILE_SUFFIX));
-
-        if (wordCounter >= wordsPerFile || files.indexOf(file) === files.length - 1) {
-            const combinedFileName = combinedNames
-                .slice(0, 3)  // Take up to 3 file names
-                .map(name => sanitizeFileName(name))
-                .join('_');
-
-            const outputFileName = `${DIST_FOLDER}/${combinedFileName}_${fileCounter}${OUTPUT_EXTENSION}`;
-            await fs.writeFile(outputFileName, concatenatedContent);
-            console.log(`Created file: ${outputFileName}`);
-
-            concatenatedContent = '';
-            wordCounter = 0;
-            fileCounter++;
-            combinedNames = [];
-        }
+        await fs.mkdir(path.dirname(outputPath), {recursive: true});
+        await fs.writeFile(outputPath, content);
+        console.log(`Created file: ${outputPath}`);
     }
-
-    if (concatenatedContent) {
-        await fs.writeFile(`${DIST_FOLDER}/concatenated_${fileCounter}${FILE_SUFFIX}`, concatenatedContent);
-    }
-}
-
-function sanitizeFileName(name) {
-    return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
 async function clearDistFolder() {
@@ -111,7 +73,6 @@ async function createDistFolder() {
  */
 async function main() {
     const sourcePath = process.argv[2];
-    const wordsPerFile = parseInt(process.argv[3]) || WORDS_PER_FILE;
 
     if (!sourcePath) {
         console.error('Please provide a source path as an argument.');
@@ -122,8 +83,8 @@ async function main() {
         await createDistFolder();
 
         const files = await findMarkdocFiles(sourcePath);
-        await concatenateFiles(files, wordsPerFile);
-        console.log('Files have been concatenated and saved in the "dist" folder.');
+        await convertFiles(files, sourcePath);
+        console.log(`Converted ${files.length} file(s) to markdown in the "dist" folder.`);
     } catch (error) {
         console.error('An error occurred:', error);
     }

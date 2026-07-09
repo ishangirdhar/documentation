@@ -24,10 +24,4 @@ node index.js courses
 
 This will generate markdown files in the `dist` folder.
 
-You can configure how many words per file by passing a second argument to the script, e.g.:
-
-```bash
-node index.js kits 4000
-```
-
-By default, it will generate 5000 words per file.
+Each `.mdoc` file is converted 1-to-1 into a corresponding `.md` file, preserving the original directory structure inside the `dist` folder.
